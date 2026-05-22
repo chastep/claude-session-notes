@@ -10,7 +10,13 @@
  *     --config ~/.claude/notes-publisher/config.json \
  *     --plugin-root /path/to/session-notes
  *
- * Outputs: the public URL on success, exits 1 on failure.
+ *   # Remove a published note:
+ *   node deploy-note.mjs \
+ *     --remove 2026-05-21-a3f7b2c1 \
+ *     --config ~/.claude/notes-publisher/config.json \
+ *     --plugin-root /path/to/session-notes
+ *
+ * Outputs: the public URL on success (deploy), or "Removed: <uuid>" (remove). Exits 1 on failure.
  */
 
 import { readFileSync, writeFileSync, unlinkSync, existsSync } from 'fs';
@@ -55,6 +61,20 @@ function getFileSha(user, repo, branch, path) {
     return JSON.parse(result).sha || null;
   } catch {
     return null;
+  }
+}
+
+// Delete a file via GitHub Contents API (no-op if it doesn't exist)
+function deleteFile(user, repo, branch, remotePath, message) {
+  const sha = getFileSha(user, repo, branch, remotePath);
+  if (!sha) return;
+  const body = { message, sha, branch };
+  const bodyFile = `/tmp/gh-delete-${Date.now()}.json`;
+  writeFileSync(bodyFile, JSON.stringify(body), 'utf8');
+  try {
+    gh(`repos/${user}/${repo}/contents/${encodeURIComponent(remotePath)} --method DELETE`, bodyFile);
+  } finally {
+    try { unlinkSync(bodyFile); } catch {}
   }
 }
 
@@ -124,16 +144,55 @@ function escapeHtml(s) {
     .replace(/"/g, '&quot;');
 }
 
+// ── Shared: load manifest from GitHub ────────────────────────────────────────
+
+function loadManifest(user, repo, branch) {
+  const sha = getFileSha(user, repo, branch, 'manifest.json');
+  let entries = [];
+  if (sha) {
+    try {
+      const raw = gh(`repos/${user}/${repo}/contents/manifest.json?ref=${branch}`);
+      const decoded = Buffer.from(JSON.parse(raw).content.replace(/\n/g, ''), 'base64').toString('utf8');
+      entries = JSON.parse(decoded);
+    } catch {
+      entries = [];
+    }
+  }
+  return { entries, sha };
+}
+
+function saveManifestAndIndex(user, repo, branch, entries, manifestSha, pluginRoot, domain, rootDomain, updatedAt, commitVerb, uuid) {
+  entries.sort((a, b) => b.date.localeCompare(a.date));
+  uploadFile(user, repo, branch, 'manifest.json', JSON.stringify(entries, null, 2), `Update manifest: ${commitVerb} ${uuid}`, manifestSha);
+
+  process.stderr.write('Regenerating index.html...\n');
+  const indexTemplatePath = join(pluginRoot, 'assets', 'index-template.html');
+  let indexTemplate;
+  try {
+    indexTemplate = readFileSync(indexTemplatePath, 'utf8');
+  } catch {
+    console.error(`Could not read index template at ${indexTemplatePath}`);
+    process.exit(1);
+  }
+  const indexHtml = buildIndexHtml(indexTemplate, entries, domain, rootDomain, updatedAt);
+  const indexSha  = getFileSha(user, repo, branch, 'index.html');
+  uploadFile(user, repo, branch, 'index.html', indexHtml, `Update index: ${commitVerb} ${uuid}`, indexSha);
+}
+
 // ── Main ──────────────────────────────────────────────────────────────────────
 
 const args = parseArgs(process.argv.slice(2));
 
-if (!args['uuid'] || !args['config'] || !args['plugin-root']) {
+const removeUuid = args['remove'];
+const deployUuid = args['uuid'];
+
+if ((!removeUuid && !deployUuid) || !args['config'] || !args['plugin-root']) {
   console.error('Usage: deploy-note.mjs --uuid <uuid> --config <path> --plugin-root <path>');
+  console.error('       deploy-note.mjs --remove <uuid> --config <path> --plugin-root <path>');
   process.exit(1);
 }
 
-const uuid       = args['uuid'];
+const uuid       = removeUuid || deployUuid;
 const configPath = expandPath(args['config']);
 const pluginRoot = expandPath(args['plugin-root']);
 
@@ -149,7 +208,7 @@ try {
 const { github_user: user, github_repo: repo, github_branch: branch, domain, output_dir } = config;
 const outputDir  = expandPath(output_dir);
 const rootDomain = domain.replace(/^notes\./, '');
-const publicUrl  = `https://${domain}/${uuid}`;
+const updatedAt  = new Date().toUTCString();
 
 // Check gh auth
 try {
@@ -158,6 +217,28 @@ try {
   console.error('GitHub CLI is not authenticated. Run: gh auth login');
   process.exit(1);
 }
+
+// ── Remove mode ───────────────────────────────────────────────────────────────
+
+if (removeUuid) {
+  process.stderr.write(`Deleting ${uuid}.md...\n`);
+  deleteFile(user, repo, branch, `${uuid}.md`, `Remove note ${uuid}`);
+
+  process.stderr.write(`Deleting ${uuid}.html...\n`);
+  deleteFile(user, repo, branch, `${uuid}.html`, `Remove note ${uuid}`);
+
+  process.stderr.write('Updating manifest.json...\n');
+  const { entries, sha: manifestSha } = loadManifest(user, repo, branch);
+  const filtered = entries.filter(e => e.uuid !== uuid);
+  saveManifestAndIndex(user, repo, branch, filtered, manifestSha, pluginRoot, domain, rootDomain, updatedAt, 'remove', uuid);
+
+  console.log(`Removed: ${uuid}`);
+  process.exit(0);
+}
+
+// ── Deploy mode ───────────────────────────────────────────────────────────────
+
+const publicUrl = `https://${domain}/${uuid}`;
 
 // Load local files
 const mdPath   = join(outputDir, `${uuid}.md`);
@@ -188,7 +269,6 @@ function extractMeta(md) {
 }
 
 const noteMeta = extractMeta(mdContent);
-const updatedAt = new Date().toUTCString();
 
 // ── Step 1: Bootstrap CNAME if it doesn't exist ───────────────────────────────
 
@@ -202,31 +282,19 @@ if (!cnameSha) {
 
 process.stderr.write(`Uploading ${uuid}.md...\n`);
 const mdSha = getFileSha(user, repo, branch, `${uuid}.md`);
-uploadFile(user, repo, branch, `${uuid}.md`, mdContent, `Add note ${uuid}`, mdSha);
+uploadFile(user, repo, branch, `${uuid}.md`, mdContent, `Update note ${uuid}`, mdSha);
 
 process.stderr.write(`Uploading ${uuid}.html...\n`);
 const htmlSha = getFileSha(user, repo, branch, `${uuid}.html`);
-uploadFile(user, repo, branch, `${uuid}.html`, htmlContent, `Add note ${uuid}`, htmlSha);
+uploadFile(user, repo, branch, `${uuid}.html`, htmlContent, `Update note ${uuid}`, htmlSha);
 
 // ── Step 3: Update manifest.json ─────────────────────────────────────────────
 
 process.stderr.write('Updating manifest.json...\n');
+const { entries: manifest, sha: manifestSha } = loadManifest(user, repo, branch);
 
-let manifest = [];
-const manifestSha = getFileSha(user, repo, branch, 'manifest.json');
-if (manifestSha) {
-  try {
-    const raw = gh(`repos/${user}/${repo}/contents/manifest.json?ref=${branch}`);
-    const decoded = Buffer.from(JSON.parse(raw).content.replace(/\n/g, ''), 'base64').toString('utf8');
-    manifest = JSON.parse(decoded);
-  } catch {
-    manifest = [];
-  }
-}
-
-// Remove existing entry for this uuid if re-deploying
-manifest = manifest.filter(e => e.uuid !== uuid);
-manifest.push({
+const updatedManifest = manifest.filter(e => e.uuid !== uuid);
+updatedManifest.push({
   uuid,
   title:       noteMeta.title,
   date:        noteMeta.date || new Date().toISOString().slice(0, 10),
@@ -234,39 +302,7 @@ manifest.push({
   url:         publicUrl,
 });
 
-// Sort newest first
-manifest.sort((a, b) => b.date.localeCompare(a.date));
-
-uploadFile(
-  user, repo, branch,
-  'manifest.json',
-  JSON.stringify(manifest, null, 2),
-  `Update manifest: add ${uuid}`,
-  manifestSha
-);
-
-// ── Step 4: Regenerate index.html ─────────────────────────────────────────────
-
-process.stderr.write('Regenerating index.html...\n');
-
-const indexTemplatePath = join(pluginRoot, 'assets', 'index-template.html');
-let indexTemplate;
-try {
-  indexTemplate = readFileSync(indexTemplatePath, 'utf8');
-} catch {
-  console.error(`Could not read index template at ${indexTemplatePath}`);
-  process.exit(1);
-}
-
-const indexHtml = buildIndexHtml(indexTemplate, manifest, domain, rootDomain, updatedAt);
-const indexSha  = getFileSha(user, repo, branch, 'index.html');
-uploadFile(
-  user, repo, branch,
-  'index.html',
-  indexHtml,
-  `Update index: add ${uuid}`,
-  indexSha
-);
+saveManifestAndIndex(user, repo, branch, updatedManifest, manifestSha, pluginRoot, domain, rootDomain, updatedAt, 'add', uuid);
 
 // ── Done ─────────────────────────────────────────────────────────────────────
 

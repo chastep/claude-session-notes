@@ -1,6 +1,6 @@
 ---
 description: Capture and publish structured notes from the current Claude session to GitHub Pages at notes.{domain}/{uuid}. Generates markdown + self-contained HTML locally, then optionally deploys.
-argument-hint: [title] [--deploy <uuid>]
+argument-hint: [title] [--deploy <uuid>] [--remove <uuid>] [--edit <uuid>]
 allowed-tools: Read, Write, Bash, Edit
 ---
 
@@ -40,9 +40,23 @@ Ask: "Should I create the GitHub repo `{github_user}/{github_repo}` now?" — if
 
 ---
 
-## Step 2: Handle --deploy flag
+## Step 2: Handle flags
 
-If invoked as `/notes --deploy {uuid}`, skip to **Step 5** using the provided UUID.
+**`/notes --deploy {uuid}`** — Skip to **Step 5** using the provided UUID.
+
+**`/notes --remove {uuid}`** — Remove a published note:
+```bash
+node "$PLUGIN_ROOT/scripts/deploy-note.mjs" \
+  --remove "{uuid}" \
+  --config ~/.claude/notes-publisher/config.json \
+  --plugin-root "$PLUGIN_ROOT"
+```
+Report: "Removed `{uuid}` from GitHub Pages and manifest." Then stop — do not synthesize or deploy.
+
+**`/notes --edit {uuid}`** — Re-synthesize and re-deploy an existing note under the same UUID:
+1. Read `{output_dir}/{uuid}.md` to show the user the current title and description.
+2. Inform the user: "I'll re-synthesize this session and redeploy under the same UUID."
+3. Proceed to **Step 3** (synthesize), then **Step 4** (generate with `--uuid {uuid}` flag), then **Step 5** (deploy directly without asking — the user already confirmed by invoking `--edit`).
 
 ---
 
@@ -94,12 +108,13 @@ PLUGIN_ROOT=$(ls -d ~/.claude/plugins/cache/claude-plugins-official/session-note
 echo $PLUGIN_ROOT
 ```
 
-Then generate:
+Then generate (add `--uuid {uuid}` when in edit mode to preserve the existing UUID):
 ```bash
 node "$PLUGIN_ROOT/scripts/generate-note.mjs" \
   --summary-file /tmp/session-notes-summary.md \
   --config ~/.claude/notes-publisher/config.json \
-  --plugin-root "$PLUGIN_ROOT"
+  --plugin-root "$PLUGIN_ROOT" \
+  [--uuid "{existing-uuid}"]
 ```
 
 Capture the JSON output `{ uuid, md_path, html_path, public_url }` and show the user:

@@ -9,6 +9,13 @@
  *     --config ~/.claude/notes-publisher/config.json \
  *     --plugin-root /path/to/session-notes
  *
+ *   # Preserve an existing UUID (edit mode):
+ *   node generate-note.mjs \
+ *     --summary-file /tmp/session-notes-summary.md \
+ *     --uuid 2026-05-21-a3f7b2c1 \
+ *     --config ~/.claude/notes-publisher/config.json \
+ *     --plugin-root /path/to/session-notes
+ *
  * Outputs JSON to stdout: { uuid, md_path, html_path, public_url }
  */
 
@@ -251,9 +258,9 @@ try {
 
 // Parse frontmatter
 const { meta, body } = parseFrontmatter(rawMarkdown);
-const uuid  = generateUUID();
+const uuid  = args['uuid'] || generateUUID();
 const today = new Date();
-const dateStr = today.toISOString().slice(0, 10);
+const dateStr = meta.date || today.toISOString().slice(0, 10);
 const generatedAt = today.toUTCString();
 
 const title       = meta.title || 'Session Notes';
