@@ -157,6 +157,17 @@ function mdToHtml(md) {
       continue;
     }
 
+    // Raw HTML block passthrough (line starts with <)
+    if (line.trimStart().startsWith('<')) {
+      const htmlLines = [];
+      while (i < lines.length && lines[i].trim() !== '') {
+        htmlLines.push(lines[i]);
+        i++;
+      }
+      out.push(htmlLines.join('\n'));
+      continue;
+    }
+
     // Blank line
     if (line.trim() === '') {
       i++;
