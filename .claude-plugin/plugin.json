@@ -1,0 +1,12 @@
+{
+  "name": "session-notes",
+  "version": "1.0.0",
+  "description": "Capture, summarize, and publish Claude session notes to GitHub Pages at notes.{your-domain}/{uuid}. Domain-agnostic — works with any domain you own.",
+  "author": {
+    "name": "Chase Stephens",
+    "email": "chasestephens92@gmail.com"
+  },
+  "homepage": "https://github.com/chastep/session-notes",
+  "license": "MIT",
+  "keywords": ["notes", "session", "github-pages", "publishing", "markdown", "sharing"]
+}

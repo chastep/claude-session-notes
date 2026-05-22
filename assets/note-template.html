@@ -1,0 +1,334 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="note-uuid" content="{{UUID}}">
+  <meta name="note-title" content="{{TITLE}}">
+  <meta name="note-date" content="{{DATE}}">
+  <meta name="note-description" content="{{DESCRIPTION}}">
+  <title>{{TITLE}} — session notes</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #1a1918;
+      --bg2: #222120;
+      --bg3: #2a2927;
+      --fg: #d1cfc5;
+      --fg2: #9e9c94;
+      --accent: #D97757;
+      --accent2: #e89070;
+      --border: rgba(255,255,255,0.07);
+      --code-bg: #252321;
+      --green: #7eb87e;
+      --font: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      --mono: ui-monospace, 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+    }
+
+    @media (prefers-color-scheme: light) {
+      :root {
+        --bg: #fafaf8;
+        --bg2: #f2f0eb;
+        --bg3: #e8e6e0;
+        --fg: #2a2826;
+        --fg2: #6b6860;
+        --accent: #c4622a;
+        --accent2: #d4723a;
+        --border: rgba(0,0,0,0.08);
+        --code-bg: #f0ede6;
+        --green: #3a7a3a;
+      }
+    }
+
+    html { background: var(--bg); color: var(--fg); font-family: var(--font); font-size: 16px; line-height: 1.6; }
+
+    body { min-height: 100vh; }
+
+    .shell {
+      max-width: 780px;
+      margin: 0 auto;
+      padding: 2rem 1.5rem 4rem;
+    }
+
+    /* ── Header ── */
+    .note-header {
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 1.25rem;
+      margin-bottom: 2rem;
+    }
+
+    .note-eyebrow {
+      font-size: 0.75rem;
+      font-family: var(--mono);
+      color: var(--fg2);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-bottom: 0.5rem;
+    }
+
+    .note-eyebrow a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+
+    .note-eyebrow a:hover { text-decoration: underline; }
+
+    .note-title {
+      font-size: 1.6rem;
+      font-weight: 700;
+      line-height: 1.25;
+      color: var(--fg);
+      margin-bottom: 0.75rem;
+    }
+
+    .note-meta {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+      font-size: 0.8rem;
+      color: var(--fg2);
+      font-family: var(--mono);
+    }
+
+    .note-meta .date { color: var(--fg2); }
+
+    .note-meta .uuid-chip {
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 1px 6px;
+      color: var(--accent);
+    }
+
+    .note-meta .permalink {
+      color: var(--fg2);
+      text-decoration: none;
+    }
+
+    .note-meta .permalink:hover { color: var(--accent); }
+
+    /* ── Controls ── */
+    .controls {
+      display: flex;
+      gap: 0.5rem;
+      margin-top: 1rem;
+    }
+
+    .btn {
+      font-family: var(--mono);
+      font-size: 0.75rem;
+      padding: 5px 12px;
+      border-radius: 5px;
+      border: 1px solid var(--border);
+      background: var(--bg3);
+      color: var(--fg2);
+      cursor: pointer;
+      transition: color 0.15s, border-color 0.15s, background 0.15s;
+      letter-spacing: 0.02em;
+    }
+
+    .btn:hover {
+      color: var(--fg);
+      border-color: var(--accent);
+      background: var(--bg2);
+    }
+
+    .btn.active {
+      color: var(--accent);
+      border-color: var(--accent);
+    }
+
+    /* ── Content areas ── */
+    #html-view { display: block; }
+    #md-view   { display: none; }
+
+    /* ── Prose (rendered HTML view) ── */
+    .prose h1, .prose h2, .prose h3 {
+      color: var(--fg);
+      font-weight: 700;
+      line-height: 1.3;
+      margin-top: 2rem;
+      margin-bottom: 0.6rem;
+    }
+
+    .prose h1 { font-size: 1.4rem; }
+    .prose h2 { font-size: 1.15rem; border-bottom: 1px solid var(--border); padding-bottom: 0.3rem; }
+    .prose h3 { font-size: 1rem; color: var(--accent); }
+
+    .prose p { margin-bottom: 1rem; color: var(--fg); }
+
+    .prose ul, .prose ol {
+      margin: 0.5rem 0 1rem 1.4rem;
+    }
+
+    .prose li { margin-bottom: 0.3rem; }
+
+    .prose li input[type="checkbox"] {
+      margin-right: 0.4rem;
+      accent-color: var(--accent);
+    }
+
+    .prose pre {
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 1rem 1.25rem;
+      overflow-x: auto;
+      margin: 1rem 0;
+      font-family: var(--mono);
+      font-size: 0.82rem;
+      line-height: 1.55;
+    }
+
+    .prose code {
+      font-family: var(--mono);
+      font-size: 0.85em;
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      padding: 1px 5px;
+    }
+
+    .prose pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+    }
+
+    .prose strong { color: var(--fg); font-weight: 600; }
+    .prose em { font-style: italic; color: var(--fg2); }
+
+    .prose a { color: var(--accent); }
+    .prose a:hover { color: var(--accent2); }
+
+    .prose blockquote {
+      border-left: 3px solid var(--accent);
+      padding-left: 1rem;
+      margin: 1rem 0;
+      color: var(--fg2);
+      font-style: italic;
+    }
+
+    /* ── Raw markdown view ── */
+    .md-raw-wrap {
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 1.25rem;
+      overflow-x: auto;
+    }
+
+    .md-raw-wrap pre {
+      font-family: var(--mono);
+      font-size: 0.82rem;
+      line-height: 1.6;
+      color: var(--fg);
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    /* ── Footer ── */
+    .note-footer {
+      margin-top: 3rem;
+      padding-top: 1rem;
+      border-top: 1px solid var(--border);
+      font-size: 0.75rem;
+      font-family: var(--mono);
+      color: var(--fg2);
+      display: flex;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+
+    .note-footer a { color: var(--fg2); text-decoration: none; }
+    .note-footer a:hover { color: var(--accent); }
+
+    /* ── Copy feedback ── */
+    .copied-flash { color: var(--green) !important; border-color: var(--green) !important; }
+
+    @media (max-width: 600px) {
+      .shell { padding: 1.25rem 1rem 3rem; }
+      .note-title { font-size: 1.3rem; }
+      .controls { flex-wrap: wrap; }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <header class="note-header">
+      <div class="note-eyebrow">
+        <a href="https://{{DOMAIN}}">← all notes</a>
+      </div>
+      <h1 class="note-title">{{TITLE}}</h1>
+      <div class="note-meta">
+        <span class="date">{{DATE}}</span>
+        <span class="uuid-chip">{{UUID}}</span>
+        <a class="permalink" href="{{PUBLIC_URL}}" title="Permalink">permalink</a>
+      </div>
+      <div class="controls">
+        <button class="btn" id="btn-toggle" onclick="toggleView()">show markdown</button>
+        <button class="btn" id="btn-copy" onclick="copyMarkdown()">copy markdown</button>
+      </div>
+    </header>
+
+    <main>
+      <div id="html-view" class="prose">
+        {{RENDERED_HTML}}
+      </div>
+
+      <div id="md-view">
+        <div class="md-raw-wrap">
+          <pre id="md-raw">{{RAW_MARKDOWN}}</pre>
+        </div>
+      </div>
+    </main>
+
+    <footer class="note-footer">
+      <span>Generated {{GENERATED_AT}}</span>
+      <span><a href="https://{{DOMAIN}}">notes.{{ROOT_DOMAIN}}</a></span>
+    </footer>
+  </div>
+
+  <script>
+    var showingHtml = true;
+
+    function toggleView() {
+      showingHtml = !showingHtml;
+      document.getElementById('html-view').style.display = showingHtml ? 'block' : 'none';
+      document.getElementById('md-view').style.display   = showingHtml ? 'none'  : 'block';
+      document.getElementById('btn-toggle').textContent  = showingHtml ? 'show markdown' : 'show rendered';
+      document.getElementById('btn-toggle').classList.toggle('active', !showingHtml);
+    }
+
+    function copyMarkdown() {
+      var raw = document.getElementById('md-raw').textContent;
+      var btn = document.getElementById('btn-copy');
+      navigator.clipboard.writeText(raw).then(function() {
+        btn.textContent = 'copied!';
+        btn.classList.add('copied-flash');
+        setTimeout(function() {
+          btn.textContent = 'copy markdown';
+          btn.classList.remove('copied-flash');
+        }, 2000);
+      }).catch(function() {
+        // Fallback for older browsers
+        var ta = document.createElement('textarea');
+        ta.value = raw;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.focus();
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        btn.textContent = 'copied!';
+        setTimeout(function() { btn.textContent = 'copy markdown'; }, 2000);
+      });
+    }
+  </script>
+</body>
+</html>
