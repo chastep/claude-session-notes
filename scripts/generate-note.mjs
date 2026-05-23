@@ -160,9 +160,22 @@ function mdToHtml(md) {
     // Raw HTML block passthrough (line starts with <)
     if (line.trimStart().startsWith('<')) {
       const htmlLines = [];
-      while (i < lines.length && lines[i].trim() !== '') {
+      // script/style blocks may contain blank lines — read until closing tag
+      const blockMatch = line.trimStart().match(/^<(script|style)\b/i);
+      if (blockMatch) {
+        const closeTag = '</' + blockMatch[1].toLowerCase() + '>';
         htmlLines.push(lines[i]);
         i++;
+        while (i < lines.length) {
+          htmlLines.push(lines[i]);
+          if (lines[i].includes(closeTag)) { i++; break; }
+          i++;
+        }
+      } else {
+        while (i < lines.length && lines[i].trim() !== '') {
+          htmlLines.push(lines[i]);
+          i++;
+        }
       }
       out.push(htmlLines.join('\n'));
       continue;
