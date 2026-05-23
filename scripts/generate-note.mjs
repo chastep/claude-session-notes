@@ -293,6 +293,15 @@ const domain      = config.domain; // e.g. "notes.thethoughtdungeon.com"
 const rootDomain  = domain.replace(/^notes\./, ''); // e.g. "thethoughtdungeon.com"
 const publicUrl   = `https://${domain}/${uuid}`;
 
+// Split body into human-readable content and Claude handoff section
+const handoffMarker = '\n## Claude Handoff\n';
+const handoffIdx = body.indexOf(handoffMarker);
+const displayBody = handoffIdx !== -1 ? body.slice(0, handoffIdx).trim() : body;
+const handoffContent = handoffIdx !== -1 ? body.slice(handoffIdx + handoffMarker.length).trim() : '';
+const claudeContext = handoffContent
+  ? `I'm picking up from a previous Claude Code session.\n\n**Session:** ${title}\n**Note:** ${publicUrl}\n**Date:** ${dateStr}\n\n${handoffContent}`
+  : '';
+
 // Update frontmatter with uuid and generated date
 const updatedFrontmatter = `---
 title: "${title}"
@@ -308,9 +317,9 @@ const finalMarkdown = `${updatedFrontmatter}\n${body}`;
 const mdPath = join(outputDir, `${uuid}.md`);
 writeFileSync(mdPath, finalMarkdown, 'utf8');
 
-// Render HTML from markdown body (skip frontmatter for display)
-const renderedHtml = mdToHtml(body);
-const rawMarkdownEscaped = escapeForPre(finalMarkdown);
+// Render HTML from markdown body (skip frontmatter and Claude Handoff section)
+const renderedHtml = mdToHtml(displayBody);
+const claudeContextEscaped = escapeForPre(claudeContext);
 
 // Format display date
 const displayDate = today.toLocaleDateString('en-US', {
@@ -319,16 +328,16 @@ const displayDate = today.toLocaleDateString('en-US', {
 
 // Substitute template
 const htmlContent = applyTemplate(htmlTemplate, {
-  TITLE:         title,
-  UUID:          uuid,
-  DATE:          displayDate,
-  DOMAIN:        domain,
-  ROOT_DOMAIN:   rootDomain,
-  PUBLIC_URL:    publicUrl,
-  RENDERED_HTML: renderedHtml,
-  RAW_MARKDOWN:  rawMarkdownEscaped,
-  GENERATED_AT:  generatedAt,
-  DESCRIPTION:   description,
+  TITLE:          title,
+  UUID:           uuid,
+  DATE:           displayDate,
+  DOMAIN:         domain,
+  ROOT_DOMAIN:    rootDomain,
+  PUBLIC_URL:     publicUrl,
+  RENDERED_HTML:  renderedHtml,
+  CLAUDE_CONTEXT: claudeContextEscaped,
+  GENERATED_AT:   generatedAt,
+  DESCRIPTION:    description,
 });
 
 // Write HTML file

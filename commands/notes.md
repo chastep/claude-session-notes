@@ -96,6 +96,26 @@ description: "One sentence summary"
 ```language
 code here
 ```
+
+## Claude Handoff
+[This section is written for Claude, not humans — it becomes the "copy for Claude" button content]
+
+### What we worked on
+[4–6 sentences capturing the full arc of the session: the problem being solved, the approach taken, the constraints encountered, and the reasoning behind key choices — not just outcomes]
+
+### Key decisions and why
+- **[Decision]**: [rationale — include what alternatives were considered and why they were ruled out]
+
+### What was explored but not pursued
+(omit this section entirely if nothing significant was ruled out)
+- **[Alternative]**: [why it wasn't the right fit — be specific so future Claude doesn't re-litigate it]
+
+### Current state
+[Describe what exists now: what's working, what's in progress, what was intentionally left incomplete and why]
+
+### Good places to pick up
+- [Specific direction, question, or next step to continue from]
+- [Another direction or open question worth exploring]
 ```
 
 ---

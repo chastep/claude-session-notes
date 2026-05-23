@@ -142,7 +142,6 @@
 
     /* ── Content areas ── */
     #html-view { display: block; }
-    #md-view   { display: none; }
 
     /* ── Prose (rendered HTML view) ── */
     .prose h1, .prose h2, .prose h3 {
@@ -212,24 +211,6 @@
       font-style: italic;
     }
 
-    /* ── Raw markdown view ── */
-    .md-raw-wrap {
-      background: var(--code-bg);
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      padding: 1.25rem;
-      overflow-x: auto;
-    }
-
-    .md-raw-wrap pre {
-      font-family: var(--mono);
-      font-size: 0.82rem;
-      line-height: 1.6;
-      color: var(--fg);
-      white-space: pre-wrap;
-      word-break: break-word;
-    }
-
     /* ── Footer ── */
     .note-footer {
       margin-top: 3rem;
@@ -270,8 +251,7 @@
         <a class="permalink" href="{{PUBLIC_URL}}" title="Permalink">permalink</a>
       </div>
       <div class="controls">
-        <button class="btn" id="btn-toggle" onclick="toggleView()">show markdown</button>
-        <button class="btn" id="btn-copy" onclick="copyMarkdown()">copy markdown</button>
+        <button class="btn" id="btn-claude" onclick="copyForClaude()">copy for Claude</button>
       </div>
     </header>
 
@@ -279,12 +259,7 @@
       <div id="html-view" class="prose">
         {{RENDERED_HTML}}
       </div>
-
-      <div id="md-view">
-        <div class="md-raw-wrap">
-          <pre id="md-raw">{{RAW_MARKDOWN}}</pre>
-        </div>
-      </div>
+      <div id="claude-context" style="display:none">{{CLAUDE_CONTEXT}}</div>
     </main>
 
     <footer class="note-footer">
@@ -294,30 +269,19 @@
   </div>
 
   <script>
-    var showingHtml = true;
-
-    function toggleView() {
-      showingHtml = !showingHtml;
-      document.getElementById('html-view').style.display = showingHtml ? 'block' : 'none';
-      document.getElementById('md-view').style.display   = showingHtml ? 'none'  : 'block';
-      document.getElementById('btn-toggle').textContent  = showingHtml ? 'show markdown' : 'show rendered';
-      document.getElementById('btn-toggle').classList.toggle('active', !showingHtml);
-    }
-
-    function copyMarkdown() {
-      var raw = document.getElementById('md-raw').textContent;
-      var btn = document.getElementById('btn-copy');
-      navigator.clipboard.writeText(raw).then(function() {
+    function copyForClaude() {
+      var ctx = document.getElementById('claude-context').textContent;
+      var btn = document.getElementById('btn-claude');
+      navigator.clipboard.writeText(ctx).then(function() {
         btn.textContent = 'copied!';
         btn.classList.add('copied-flash');
         setTimeout(function() {
-          btn.textContent = 'copy markdown';
+          btn.textContent = 'copy for Claude';
           btn.classList.remove('copied-flash');
         }, 2000);
       }).catch(function() {
-        // Fallback for older browsers
         var ta = document.createElement('textarea');
-        ta.value = raw;
+        ta.value = ctx;
         ta.style.position = 'fixed';
         ta.style.opacity = '0';
         document.body.appendChild(ta);
@@ -326,7 +290,7 @@
         document.execCommand('copy');
         document.body.removeChild(ta);
         btn.textContent = 'copied!';
-        setTimeout(function() { btn.textContent = 'copy markdown'; }, 2000);
+        setTimeout(function() { btn.textContent = 'copy for Claude'; }, 2000);
       });
     }
   </script>
